@@ -297,3 +297,13 @@ This builds on [fidalgojoao/lineageos-23.2-sabrina](https://github.com/fidalgojo
 ## License
 
 This repository's own files are licensed under the [European Union Public Licence v. 1.2](LICENSE). The files modified from lineageos-23.2-sabrina stay under the [Apache License 2.0](LICENSE-APACHE-2.0); [NOTICE](NOTICE) lists them.
+
+## Disclaimer
+
+Sabrina-LineageOs is not associated with Google LLC or LineageOS in any way, and is not endorsed or supported by them.
+
+Chromecast, Google TV and Android are trademarks of Google LLC. LineageOS is a trademark of its respective owner.
+
+### Use of LLMs (AI)
+
+LLMs were used to write parts of this code. I review it, I test it, I'm responsible for it.
