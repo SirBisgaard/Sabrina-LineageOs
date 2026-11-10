@@ -1,0 +1,41 @@
+diff --git a/services/core/java/com/android/server/net/NetworkPolicyManagerService.java b/services/core/java/com/android/server/net/NetworkPolicyManagerService.java
+index d81103ca52d5..d51af159cc43 100644
+--- a/services/core/java/com/android/server/net/NetworkPolicyManagerService.java
++++ b/services/core/java/com/android/server/net/NetworkPolicyManagerService.java
+@@ -1488,7 +1488,8 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
+                 // Clear the cache for the app
+                 synchronized (mUidRulesFirstLock) {
+                     mInternetPermissionMap.delete(uid);
+-                    if (!hasInternetPermissionUL(uid) && !isSystemApp(uid)) {
++                    if (!hasInternetPermissionUL(uid) && !requestsInternetPermission(uid)
++                            && !isSystemApp(uid)) {
+                         Slog.i(TAG, "ACTION_PACKAGE_ADDED for uid=" + uid + ", no INTERNET");
+                         addUidPolicy(uid, POLICY_REJECT_ALL);
+                     }
+@@ -1497,6 +1498,26 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
+             }
+         }
+ 
++        // INTERNET is a normal permission, granted to every app that requests it, but the
++        // grant can be missing from checkUidPermission() while PACKAGE_ADDED is delivered.
++        private boolean requestsInternetPermission(int uid) {
++            final String[] packageNames = mContext.getPackageManager().getPackagesForUid(uid);
++            if (packageNames == null) return false;
++            for (String packageName : packageNames) {
++                try {
++                    final PackageInfo info = mContext.getPackageManager().getPackageInfo(
++                            packageName, PackageManager.GET_PERMISSIONS
++                                    | PackageManager.MATCH_UNINSTALLED_PACKAGES);
++                    if (ArrayUtils.contains(info.requestedPermissions,
++                            Manifest.permission.INTERNET)) {
++                        return true;
++                    }
++                } catch (PackageManager.NameNotFoundException ignored) {
++                }
++            }
++            return false;
++        }
++
+         private boolean isSystemApp(int uid) {
+             final String packageName = getPackageForUid(uid);
+             if (packageName == null) return false;

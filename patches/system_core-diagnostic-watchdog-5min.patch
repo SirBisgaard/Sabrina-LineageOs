@@ -1,0 +1,11 @@
+--- a/init/init.cpp
++++ b/init/init.cpp
+@@ -1120,7 +1120,7 @@
+         }
+         SabrinaLogBootGates(elapsed);
+         // First-boot dexopt can be slow once the framework is starting; that is not a hang.
+-        if (android::base::GetProperty("init.svc.zygote", "") == "running") limit = 900;
++        if (android::base::GetProperty("init.svc.zygote", "") == "running") limit = 300;
+     }
+     LOG(ERROR) << "sabrina_watchdog: boot incomplete; capturing state and entering bootloader";
+     SabrinaDumpLogcat();

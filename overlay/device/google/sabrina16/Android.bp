@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: Apache-2.0
+soong_namespace {}
+
+prebuilt_etc {
+    name: "SabrinaFrameworkExtensionMatrix",
+    src: "compatibility/sabrina-framework-extensions.xml",
+    filename: "compatibility_matrix.sabrina.xml",
+    sub_dir: "vintf",
+    product_specific: true,
+}
+
+// Original signed Google TV app recovered from this device's verified stock OTA.
+// Keeping a signature is necessary but does not prove runtime compatibility.
+android_app_import {
+    name: "SabrinaGoogleTVLauncher",
+    apk: "proprietary/TVLauncherXPrebuilt.apk",
+    // Keep the stock v2 signature: never realign or repackage this signed APK.
+    preprocessed: true,
+    privileged: true,
+    product_specific: true,
+    dex_preopt: { enabled: false },
+    overrides: [
+        "TVLauncher", "TVLauncherNoGMS", "TVRecommendations",
+        "TVRecommendationsNoGMS", "Catapult", "TvSampleLeanbackLauncher",
+        // Optional Google diagnostic-report uploader; core GMS remains installed.
+        "GoogleFeedback",
+    ],
+}
+
+// Restore the stock device's actual FCM-4 description. Never falsely advertise
+// a newer vendor level or skip VINTF checking to make an incompatible ROM pass.
+prebuilt_etc {
+    name: "SabrinaLegacyFrameworkMatrix4",
+    src: "compatibility/compatibility_matrix.4.xml",
+    filename: "compatibility_matrix.4.xml",
+    sub_dir: "vintf",
+}
+
+android_app_import {
+    name: "SabrinaGoogleTVDream",
+    apk: "proprietary/TVDreamXPrebuilt.apk",
+    preprocessed: true,
+    privileged: true,
+    product_specific: true,
+    dex_preopt: { enabled: false },
+    overrides: ["Backdrop", "GoogleFeedback"],
+}
+
+android_app_import {
+    name: "SabrinaGboardTV",
+    apk: "proprietary/LatinIMEGoogleTvPrebuilt.apk",
+    preprocessed: true,
+    product_specific: true,
+    dex_preopt: { enabled: false },
+    overrides: ["LeanbackIME"],
+}
+
+android_app_import {
+    name: "SabrinaSmartTube",
+    apk: "proprietary/SmartTube.apk",
+    preprocessed: true,
+    skip_preprocessed_apk_checks: true,
+    product_specific: true,
+    dex_preopt: { enabled: false },
+}
+
+
+
+android_app_import {
+    name: "SabrinaTVAxel",
+    apk: "proprietary/TVAxel.apk",
+    preprocessed: true,
+    privileged: true,
+    product_specific: true,
+    dex_preopt: { enabled: false },
+}
+
+runtime_resource_overlay {
+    name: "SabrinaFrameworkOverlay",
+    manifest: "rro/SabrinaFrameworkOverlay/AndroidManifest.xml",
+    resource_dirs: ["rro/SabrinaFrameworkOverlay/res"],
+    aaptflags: ["--no-resource-deduping"],
+    certificate: "platform",
+    product_specific: true,
+    // SetupWraith is only granted its setup permissions when it is the sole setup wizard.
+    overrides: ["TvProvision", "LineageSetupWizard"],
+}
+
+runtime_resource_overlay {
+    name: "SabrinaTvSettingsOverlay",
+    manifest: "rro/SabrinaTvSettingsOverlay/AndroidManifest.xml",
+    resource_dirs: ["rro/SabrinaTvSettingsOverlay/res"],
+    certificate: "platform",
+    product_specific: true,
+}
+
+runtime_resource_overlay {
+    name: "SabrinaWifiOverlay",
+    manifest: "rro/SabrinaWifiOverlay/AndroidManifest.xml",
+    resource_dirs: ["rro/SabrinaWifiOverlay/res"],
+    product_specific: true,
+}
+
+android_app {
+    name: "SabrinaSetupBridge",
+    srcs: ["apps/SabrinaSetupBridge/src/**/*.java"],
+    manifest: "apps/SabrinaSetupBridge/AndroidManifest.xml",
+    platform_apis: true,
+    certificate: "platform",
+    privileged: true,
+    system_ext_specific: true,
+    privapp_allowlist: "apps/SabrinaSetupBridge/privapp-permissions-sabrina-setup-bridge.xml",
+}

@@ -1,0 +1,75 @@
+--- a/init/init.cpp
++++ b/init/init.cpp
+@@ -56,6 +56,7 @@
+ #include <android-base/thread_annotations.h>
+ #include <com_android_apex_flags.h>
+ #include <fs_avb/fs_avb.h>
++#include <fs_mgr.h>
+ #include <fs_mgr_vendor_overlay.h>
+ #include <keyutils.h>
+ #include <libavb/libavb.h>
+@@ -1045,6 +1046,13 @@
+     }
+ }
+ 
++// Sabrina diagnostic switch: androidboot.sabrina_watchdog=1 on the kernel command line.
++static bool SabrinaWatchdogEnabled() {
++    std::string value;
++    return android::fs_mgr::GetKernelCmdline("androidboot.sabrina_watchdog", &value) &&
++           value == "1";
++}
++
+ // Sabrina diagnostic only: a silent hang loses all logs. Report the boot gates, then return to the
+ // bootloader with a warm reset so the retained console survives and recovery is never entered.
+ static void SabrinaLogBootGates(int elapsed) {
+@@ -1138,9 +1146,7 @@
+ }
+ 
+ int SecondStageMain(int argc, char** argv) {
+-    // Sabrina diagnostic only: preserve backtrace and request warm bootloader recovery
+-    // on init signals, without enabling userdebug or permissive SELinux.
+-    if (true /* SABRINA_BOOT_DIAGNOSTIC_SIGNAL_RECOVERY */) {
++    if (REBOOT_BOOTLOADER_ON_PANIC || SabrinaWatchdogEnabled()) {
+         InstallRebootSignalHandlers();
+     }
+ 
+@@ -1273,7 +1279,11 @@
+ 
+     InitializeSubcontext();
+ 
+-    std::thread(&SabrinaHangWatchdog).detach();
++    if (SabrinaWatchdogEnabled()) {
++        std::thread(&SabrinaHangWatchdog).detach();
++    } else {
++        LOG(INFO) << "sabrina_watchdog: disabled";
++    }
+ 
+     ActionManager& am = ActionManager::GetInstance();
+     ServiceList& sm = ServiceList::GetInstance();
+--- a/init/selinux.cpp
++++ b/init/selinux.cpp
+@@ -110,6 +110,13 @@
+     return SELINUX_ENFORCING;
+ }
+ 
++// Sabrina diagnostic switch: androidboot.sabrina_watchdog=1 on the kernel command line.
++static bool SabrinaWatchdogEnabled() {
++    std::string value;
++    return android::fs_mgr::GetKernelCmdline("androidboot.sabrina_watchdog", &value) &&
++           value == "1";
++}
++
+ bool IsEnforcing() {
+     std::string sabrina_mode;
+     if (android::fs_mgr::GetKernelCmdline("sabrina.selinux", &sabrina_mode) &&
+@@ -784,9 +791,7 @@
+     InitKernelLogging(argv);
+     LOG(ERROR) << "sabrina_bootdiag: selinux_setup_entered";
+ 
+-    // Sabrina diagnostic only: preserve backtrace and request warm bootloader recovery
+-    // on init signals, without enabling userdebug or permissive SELinux.
+-    if (true /* SABRINA_BOOT_DIAGNOSTIC_SIGNAL_RECOVERY */) {
++    if (REBOOT_BOOTLOADER_ON_PANIC || SabrinaWatchdogEnabled()) {
+         InstallRebootSignalHandlers();
+     }
+ 

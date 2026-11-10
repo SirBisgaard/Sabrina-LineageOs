@@ -1,0 +1,36 @@
+Sabrina-LineageOs
+
+Original files in this repository are licensed under the European Union
+Public Licence v. 1.2. See LICENSE.
+
+These files are modified from lineageos-23.2-sabrina
+(https://github.com/fidalgojoao/lineageos-23.2-sabrina) and stay under the
+Apache License 2.0, see LICENSE-APACHE-2.0:
+
+  overlay/device/google/sabrina16/Android.bp
+  overlay/device/google/sabrina16/lineage_gsi_sabrina16.mk
+  patches/system_core-diagnostic-watchdog-5min.patch
+  patches/system_core-diagnostic-watchdog-opt-in.patch
+
+Patches to AOSP and LineageOS projects remain subject to the licenses of the
+projects they modify.
+
+The NOTICE of lineageos-23.2-sabrina follows unchanged. The LICENSE it refers
+to is LICENSE-APACHE-2.0 here.
+
+----------------------------------------------------------------------
+
+lineageos-23.2-sabrina
+
+Original files in this repository are licensed under the Apache License 2.0.
+See LICENSE.
+
+Files in patches/kernel/ modify the Linux kernel and are licensed under
+GPL-2.0-only.
+
+Patches to AOSP and LineageOS projects remain subject to the licenses of the
+projects they modify. compatibility_matrix.4.xml derives from AOSP.
+
+This repository contains no Google apps, vendor binaries, firmware or signing
+keys. Android, Google TV and Chromecast are trademarks of Google LLC. This
+project is unofficial and is not affiliated with Google or LineageOS.
