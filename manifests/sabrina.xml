@@ -19,4 +19,7 @@
 
   <project path="vendor/google/sabrina" name="TheMuppets/proprietary_vendor_google_sabrina" />
   <project path="vendor/amlogic/g12-common" name="TheMuppets/proprietary_vendor_amlogic_g12-common" />
+
+  <remote name="mindthegapps" fetch="https://github.com/MindTheGapps/" />
+  <project path="vendor/gapps_tv" name="vendor_gapps_tv" remote="mindthegapps" revision="cinnamonbun" clone-depth="1" />
 </manifest>

@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: EUPL-1.2
+soong_namespace {}
+
+// The stock app keeps Google's signature, so it is never realigned or repackaged.
+android_app_import {
+    name: "SabrinaGoogleTVDream",
+    apk: "proprietary/TVDreamXPrebuilt.apk",
+    preprocessed: true,
+    privileged: true,
+    product_specific: true,
+    dex_preopt: {
+        enabled: false,
+    },
+    // SetupWraithPrebuilt is Google's setup wizard: LineageOS's own wizard does the setup.
+    overrides: [
+        "Backdrop",
+        "GoogleFeedback",
+        "SetupWraithPrebuilt",
+    ],
+}
+
+android_app_import {
+    name: "SabrinaSmartTube",
+    apk: "proprietary/SmartTube.apk",
+    preprocessed: true,
+    skip_preprocessed_apk_checks: true,
+    product_specific: true,
+    dex_preopt: {
+        enabled: false,
+    },
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-sabrina-dreamx.xml",
+    src: "permissions/privapp-permissions-sabrina-dreamx.xml",
+    sub_dir: "permissions",
+    product_specific: true,
+}

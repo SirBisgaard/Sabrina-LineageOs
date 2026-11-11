@@ -1,1 +1,1 @@
-device/google/sabrina16/Android.mk
+vendor/extra/Android.mk
