@@ -12,6 +12,7 @@ Apache License 2.0, see LICENSE-APACHE-2.0:
   patches/system_core-diagnostic-watchdog-5min.patch
   patches/system_core-diagnostic-watchdog-opt-in.patch
   tools/make_recovery.py (based on scripts/pipeline/prepare_recovery_menu.py)
+  overlay/vendor/extra/permissions/privapp-permissions-sabrina-dreamx.xml (unchanged)
 
 Patches to AOSP and LineageOS projects remain subject to the licenses of the
 projects they modify.

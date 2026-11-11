@@ -1,5 +1,7 @@
 # Sabrina-LineageOs
 
+> **This branch is work in progress.** It moves the project from LineageOS 23.2 to LineageOS 24.0 (Android 17), built from LineageOS's official [`android_device_google_sabrina`](https://github.com/LineageOS/android_device_google_sabrina) device tree instead of the 23.2 port. So far `tools/build.sh` only makes a plain LineageOS 24.0 build, and nothing from this branch has been flashed. The rest of this README, [HOWTO.md](HOWTO.md) and [NOTES.md](NOTES.md) still describe the tested 23.2 release, which is on the [`master`](https://github.com/SirBisgaard/Sabrina-LineageOs/tree/master) branch and published as [v1](https://github.com/SirBisgaard/Sabrina-LineageOs/releases/tag/v1).
+
 This repo is for people who want a clean Chromecast with Google TV 4K (`sabrina`): LineageOS 23.2 (Android 16) with Google's setup and Play Store, without Google TV's launcher.
 
 The project's output is running on my own Chromecast with Google TV 4K, a production unit unlocked from stock build `UTTC.250917.004` and connected to a 4K TV at 2160p60, and is working fantastically.

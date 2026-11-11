@@ -18,7 +18,13 @@ Read the [whitepaper](https://oddsolutions.github.io/Chromecast-with-Google-TV-4
 
 ## LineageOS
 
-**[LineageOS](https://lineageos.org/)** is the system this builds, including Catapult, the home screen, and the [`android_device_google_sabrina`](https://github.com/LineageOS/android_device_google_sabrina) device tree the port started from. It's built on the [Android Open Source Project](https://source.android.com/).
+**[LineageOS](https://lineageos.org/)** is the system this builds, including Catapult, the home screen. It's built on the [Android Open Source Project](https://source.android.com/).
+
+The LineageOS 24.0 branch builds directly from LineageOS's official device trees for this Chromecast: [`android_device_google_sabrina`](https://github.com/LineageOS/android_device_google_sabrina), [`android_device_amlogic_g12-common`](https://github.com/LineageOS/android_device_amlogic_g12-common) and [`android_device_amlogic_common`](https://github.com/LineageOS/android_device_amlogic_common), with the Amlogic 5.15 kernel sources LineageOS hosts. They are maintained by Nolen Johnson (npjohnson) and Bruno Martins, among others.
+
+## TheMuppets
+
+**[TheMuppets](https://github.com/TheMuppets)** hosts the device's proprietary vendor files the official device tree builds with: [`proprietary_vendor_google_sabrina`](https://github.com/TheMuppets/proprietary_vendor_google_sabrina) and [`proprietary_vendor_amlogic_g12-common`](https://github.com/TheMuppets/proprietary_vendor_amlogic_g12-common).
 
 ## SmartTube
 
