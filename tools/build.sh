@@ -419,7 +419,9 @@ step_build() {
     ccache -M "$CCACHE_SIZE" >/dev/null
     # shellcheck disable=SC2154
     lunch lineage_gsi_sabrina16 "$aosp_target_release" user
-    local goals=(systemimage checkvintf lpmake lpdump simg2img)
+    local goals=(systemimage checkvintf lpmake lpdump simg2img
+        recovery fastbootd adbd.recovery minadbd librecovery_ui_default init_second_stage.recovery
+        linker.recovery shell_and_utilities_recovery reboot.recovery ueventd.rc.recovery)
     signing && goals+=(target-files-package otatools)
     [ "$DIAGNOSTIC" = 1 ] && goals+=(adb_debug.prop userdebug_plat_sepolicy.cil)
     m -j"$JOBS" "${goals[@]}"
@@ -554,6 +556,10 @@ step_images() {
     "$DEBUGFS" -R "dump /etc/fstab.amlogic fstab.stock" vendor.img
     grep -v -E '^product[[:space:]]+/product[[:space:]]' fstab.stock > fstab.amlogic
     [ "$(wc -l < fstab.amlogic)" -eq $(( $(wc -l < fstab.stock) - 1 )) ] || die "vendor fstab has no single /product entry"
+    # Rules the stock vendor policy lacks under Android 16 enforcing.
+    "$DEBUGFS" -R "dump /etc/selinux/vendor_sepolicy.cil vendor_sepolicy.cil" vendor.img
+    "$DEBUGFS" -R "ea_get -f label.sepolicy /etc/selinux/vendor_sepolicy.cil security.selinux" vendor.img
+    cat "$TREE/device/google/sabrina16/vendor-config/sepolicy-additions.cil" >> vendor_sepolicy.cil
     printf 'u:object_r:vendor_cgroup_desc_file:s0\0' > label.cgroups
     printf 'u:object_r:vendor_configs_file:s0\0' > label.configs
     cat > vendor.debugfs <<EOF
@@ -568,11 +574,19 @@ set_inode_field /etc/fstab.amlogic mode 0100644
 set_inode_field /etc/fstab.amlogic uid 0
 set_inode_field /etc/fstab.amlogic gid 0
 ea_set -f label.configs /etc/fstab.amlogic security.selinux
+rm /etc/selinux/vendor_sepolicy.cil
+write vendor_sepolicy.cil /etc/selinux/vendor_sepolicy.cil
+set_inode_field /etc/selinux/vendor_sepolicy.cil mode 0100644
+set_inode_field /etc/selinux/vendor_sepolicy.cil uid 0
+set_inode_field /etc/selinux/vendor_sepolicy.cil gid 0
+ea_set -f label.sepolicy /etc/selinux/vendor_sepolicy.cil security.selinux
 EOF
     "$DEBUGFS" -w -f vendor.debugfs vendor.img
     "$E2FSCK" -fn vendor.img
     "$DEBUGFS" -R "dump /etc/fstab.amlogic fstab.readback" vendor.img
     cmp fstab.readback fstab.amlogic || die "vendor fstab readback differs"
+    "$DEBUGFS" -R "dump /etc/selinux/vendor_sepolicy.cil sepolicy.readback" vendor.img
+    cmp sepolicy.readback vendor_sepolicy.cil || die "vendor sepolicy readback differs"
 
     truncate -s 4M product.img
     "$MKE2FS" -q -t ext4 -F -b 4096 -L product -U 5ab21aa0-0000-4000-8000-000000000001 \
@@ -596,6 +610,13 @@ EOF
         make_boot "$DIST/boot-debug.img" " sabrina.selinux=permissive androidboot.sabrina_watchdog=1"
         mv ramdisk.release.img ramdisk.img
     fi
+
+    # Stock recovery's factory reset wipes env and relocks the device; this one doesn't.
+    unzip -q -o "$ota" recovery.img -d stock
+    local otacert=$TREE/build/make/target/product/security/testkey.x509.pem
+    signing && otacert=$KEYS/releasekey.x509.pem
+    python3 -I "$HERE/tools/make_recovery.py" --tree "$TREE" --stock stock/recovery.img \
+        --kernel "$KERNEL/dist/Image.lzma" --otacert "$otacert" --out "$DIST/recovery.img"
 
     local total=0 cmd=("$host/lpmake" --metadata-size=65536 --metadata-slots=2
         "--device=super:$SUPER_SIZE:1048576:0" --super-name=super
@@ -647,6 +668,8 @@ main() {
         fi
         log "$step"
         ( "step_$step" )
+        # A fresh device tree has lost the files stock and apps put into it.
+        [ "$step" = device ] && rm -f "$STAMPS/stock" "$STAMPS/apps"
         [[ "$always" == *" $step "* ]] || echo "diagnostic=$DIAGNOSTIC" > "$STAMPS/$step"
     done
 }

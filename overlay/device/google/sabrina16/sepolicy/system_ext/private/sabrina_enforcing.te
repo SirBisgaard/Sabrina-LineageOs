@@ -1,0 +1,14 @@
+# Lookups of services this device doesn't have, and debug reads; harmless when denied.
+dontaudit { system_server system_app platform_app untrusted_app bootanim surfaceflinger mediaswcodec } default_android_service:service_manager find;
+dontaudit system_server binderfs_logs_transactions:file read;
+dontaudit { system_server system_suspend } sysfs:file read;
+dontaudit crash_dump { keystore vold }:process ptrace;
+
+# Reads of properties without a label of their own; the reader gets the default.
+dontaudit { audioserver gmscore_app mediashell_app } vendor_default_prop:file read;
+dontaudit gmscore_app adbd_prop:file read;
+dontaudit mediashell_app shell_data_file:dir search;
+
+# Old Amlogic media and HDMI-in settings from stock vendor/build.prop.
+dontaudit vendor_init { config_prop default_prop bluetooth_prop }:property_service set;
+dontaudit vendor_init media_userdir_file:dir getattr;

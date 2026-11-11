@@ -243,10 +243,13 @@ fastboot getvar is-userspace   # no
 fastboot -S 64M flash super super.sparse.img
 fastboot flash boot boot.img
 fastboot flash vbmeta vbmeta.img
+fastboot flash recovery recovery.img
 fastboot getvar unlocked       # still yes
 fastboot -w
 fastboot reboot
 ```
+
+`recovery.img` replaces stock recovery, whose Factory data reset wipes `env` and relocks the bootloader. It is LineageOS's recovery in stock's ramdisk, without that wipe list, and it only accepts update zips signed with the build's own key. Move through its menu with the button on the Chromecast: a short press moves, a long press selects. Don't try it with `fastboot boot recovery.img` first: started that way the bootloader leaves HDMI off and the screen stays black, while from its partition the menu shows. A factory reset from this recovery hasn't been tested on a device yet, so keep wiping with `fastboot -w`.
 
 If flashing `super` fails partway, the device isn't bricked. The bootloader is untouched, so flash again from the start.
 

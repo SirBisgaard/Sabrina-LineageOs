@@ -30,13 +30,14 @@ Plus the fixes from the upstream `docs/ROOT-CAUSES.md` that the upstream device 
 
 And the kernel, `Image.lzma`: the stock `5.15.170-android14-11` kernel rebuilt with `CONFIG_DM_DEFAULT_KEY`, which Android 16's storage needs. The comments in `tools/build.sh` describe how it is pinned and checked.
 
-The `images` step turns these into the three images the upstream `docs/INSTALL.md` flashes:
+The `images` step turns these into the three images the upstream `docs/INSTALL.md` flashes, and a recovery:
 
 | Image | Contents |
 |---|---|
 | `super.sparse.img` | The new system, stock vendor plus `cgroups.json` and without `/product` in its fstab, a 4 MiB empty product, stock odm and system_dlkm |
 | `boot.img` | Stock boot with the new kernel, a first-stage fstab without `/product`, and stock's unsigned AVB footer |
 | `vbmeta.img` | Verification and hashtree disabled (flags 3), unsigned |
+| `recovery.img` | Stock recovery's ramdisk with LineageOS's recovery and the new kernel, without stock's list of partitions to wipe on a factory reset, which includes `env` and so relocks the bootloader |
 
 The build uses AOSP test keys, and doesn't sign the images. That suits an unlocked device you keep offline, not a device you hand to anyone else.
 
