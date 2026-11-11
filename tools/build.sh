@@ -202,9 +202,10 @@ step_sync() {
 
 # Resets the patched projects, copies the device tree, lays overlay/ on top and
 # applies the upstream and local patches. Delete .stamps/device to redo it after
-# changing patches or overlay/. The diagnostic init is always applied: it holds
-# the sabrina.selinux=permissive switch, and its watchdog only runs with
-# androidboot.sabrina_watchdog=1 on the kernel command line.
+# changing patches or overlay/. The diagnostic init and apexd logging are only
+# applied with DIAGNOSTIC=1: they hold the sabrina.selinux=permissive switch and
+# the watchdog, which only the diagnostic boot images switch on. The step reruns
+# by itself when DIAGNOSTIC changes.
 step_device() {
     cd "$TREE"
     local project
@@ -220,11 +221,13 @@ step_device() {
     git -C packages/apps/TvSettings apply "$HERE/patches/packages_apps_TvSettings-hdmi-cec-allowlist.patch"
     # LineageOS blocks new apps whose INTERNET grant isn't visible yet at install time.
     git -C frameworks/base apply "$HERE/patches/frameworks_base-keep-network-for-apps-requesting-internet.patch"
-    git -C system/core apply "$GUIDE/patches/diagnostic/system_core-init-watchdog.patch"
-    git -C system/apex apply "$GUIDE/patches/diagnostic/system_apex-bootstrap-logging.patch"
-    git -C system/core apply "$HERE/patches/system_core-diagnostic-watchdog-5min.patch"
-    git -C system/core apply "$HERE/patches/system_core-diagnostic-watchdog-opt-in.patch"
-    log "diagnostic init and apexd logging applied"
+    if [ "$DIAGNOSTIC" = 1 ]; then
+        git -C system/core apply "$GUIDE/patches/diagnostic/system_core-init-watchdog.patch"
+        git -C system/apex apply "$GUIDE/patches/diagnostic/system_apex-bootstrap-logging.patch"
+        git -C system/core apply "$HERE/patches/system_core-diagnostic-watchdog-5min.patch"
+        git -C system/core apply "$HERE/patches/system_core-diagnostic-watchdog-opt-in.patch"
+        log "diagnostic init and apexd logging applied"
+    fi
 }
 
 # Unpacks the stock product image, extracts the launcher, screensaver, Gboard,
@@ -577,7 +580,7 @@ EOF
 
     python3 "$TREE/system/tools/mkbootimg/unpack_bootimg.py" --boot_img stock/boot.img --out stock/boot >/dev/null
     python3 -I "$HERE/tools/edit_ramdisk_fstab.py" stock/boot/ramdisk ramdisk.img first_stage_ramdisk/fstab.amlogic 'product '
-    make_boot "$DIST/boot.img" " sabrina.selinux=permissive"
+    make_boot "$DIST/boot.img" ""
     if [ "$DIAGNOSTIC" = 1 ]; then
         make_boot "$DIST/boot-permissive.img" " sabrina.selinux=permissive androidboot.sabrina_watchdog=1"
         local files=() name
@@ -635,13 +638,16 @@ main() {
     local step
     for step in "${steps[@]}"; do
         declare -F "step_$step" >/dev/null || die "unknown step: $step"
+        if [ "$step" = device ] && [ "$(cat "$STAMPS/device" 2>/dev/null)" != "diagnostic=$DIAGNOSTIC" ]; then
+            rm -f "$STAMPS/device"
+        fi
         if [[ "$always" != *" $step "* ]] && [ -e "$STAMPS/$step" ]; then
             log "$step: already done"
             continue
         fi
         log "$step"
         ( "step_$step" )
-        [[ "$always" == *" $step "* ]] || touch "$STAMPS/$step"
+        [[ "$always" == *" $step "* ]] || echo "diagnostic=$DIAGNOSTIC" > "$STAMPS/$step"
     done
 }
 

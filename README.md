@@ -35,12 +35,12 @@ The `images` step turns these into the three images the upstream `docs/INSTALL.m
 | Image | Contents |
 |---|---|
 | `super.sparse.img` | The new system, stock vendor plus `cgroups.json` and without `/product` in its fstab, a 4 MiB empty product, stock odm and system_dlkm |
-| `boot.img` | Stock boot with the new kernel, a first-stage fstab without `/product`, `sabrina.selinux=permissive` on the command line, and stock's unsigned AVB footer |
+| `boot.img` | Stock boot with the new kernel, a first-stage fstab without `/product`, and stock's unsigned AVB footer |
 | `vbmeta.img` | Verification and hashtree disabled (flags 3), unsigned |
 
 The build uses AOSP test keys, and doesn't sign the images. That suits an unlocked device you keep offline, not a device you hand to anyone else.
 
-**Tested on one device.** The images run SELinux permissive with verification disabled. Use the Chromecast's own power supply: on a weak USB source, such as a computer's USB port, the boot waits for the low-power warning, see [Findings from flashing](NOTES.md#findings-from-flashing).
+**Tested on one device.** The images run SELinux enforcing, with verification disabled. Use the Chromecast's own power supply: on a weak USB source, such as a computer's USB port, the boot waits for the low-power warning, see [Findings from flashing](NOTES.md#findings-from-flashing).
 
 ## Notes
 

@@ -271,17 +271,17 @@ adb shell service call netpolicy 3 i32 <uid> i32 262144
 
 ## Diagnostic build
 
-Every build includes the upstream `patches/diagnostic/` changes to init and apexd, because they hold the `sabrina.selinux=permissive` switch. `DIAGNOSTIC=1` adds two extra boot images: `boot-permissive.img`, which is `boot.img` with the watchdog switched on, and `boot-debug.img`. Booted with either, init logs each boot stage. If boot doesn't finish, it copies logcat into the kernel log and warm-reboots to the bootloader, so the log survives in RAM. The watchdog only runs with `androidboot.sabrina_watchdog=1` on the kernel command line (`patches/system_core-diagnostic-watchdog-opt-in.patch`), which the diagnostic boot images add and a production boot image leaves out. Without it, init logs `sabrina_watchdog: disabled` and doesn't reboot to the bootloader on a crash. It waits 2.5 minutes for boot to complete, or 5 minutes once zygote is running (`patches/system_core-diagnostic-watchdog-5min.patch`; upstream waits 15). Use it to debug, not daily:
+A normal build runs SELinux enforcing and has no diagnostic code. `DIAGNOSTIC=1` adds the upstream `patches/diagnostic/` changes to init and apexd, which hold the `sabrina.selinux=permissive` switch and a boot watchdog, and two extra boot images: `boot-permissive.img`, which is `boot.img` with SELinux permissive and the watchdog switched on, and `boot-debug.img`. Booted with either, init logs each boot stage. If boot doesn't finish, the watchdog copies logcat into the kernel log and warm-reboots to the bootloader, so the log survives in RAM. It only runs with `androidboot.sabrina_watchdog=1` on the kernel command line (`patches/system_core-diagnostic-watchdog-opt-in.patch`), which only the diagnostic boot images add. It waits 2.5 minutes for boot to complete, or 5 minutes once zygote is running (`patches/system_core-diagnostic-watchdog-5min.patch`; upstream waits 15). The `boot.img` of a diagnostic build is the normal enforcing one, but its system image contains the diagnostic code, so use a diagnostic build to debug, not daily:
 
 ```bash
 docker run --rm -e DIAGNOSTIC=1 -v "$PWD/work":/work sabrina-build   # from the repository folder
 ```
 
-`DIAGNOSTIC` takes effect in the `build` and `images` steps, which always run.
+Switching `DIAGNOSTIC` on or off redoes the `device` step by itself, so the next build applies or removes the diagnostic code.
 
 ### Reading logs from a failed boot
 
-`boot-debug.img` is `boot-permissive.img` with Android's own debug-ramdisk files (`adb_debug.prop` and the userdebug policy) instead of the production adb settings. On an unlocked device it boots the same system with adb and `adb root`. Only ever boot it from RAM; never flash it:
+`boot-debug.img` is `boot-permissive.img` with Android's own debug-ramdisk files (`adb_debug.prop` and the userdebug policy) and adb switched on. On an unlocked device it boots the same system with adb and `adb root`. Only ever boot it from RAM; never flash it:
 
 ```bash
 fastboot boot boot-debug.img
