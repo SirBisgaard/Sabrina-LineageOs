@@ -280,7 +280,7 @@ step_kernel_source() {
     local patches=common_drivers/auto_patch/common14-5.15/common group patch change_id
     for group in $(ls "$patches"); do
         for patch in $(find "$patches/$group" -name '*.patch' | sort); do
-            change_id=$(grep -m1 '^Change-Id' "$patch" | awk '{print $2}')
+            change_id=$({ grep -m1 '^Change-Id' "$patch" || true; } | awk '{print $2}')
             if [ -n "$change_id" ] && git log -n 400 --format=%B | grep -q "$change_id"; then
                 continue
             fi
@@ -346,7 +346,7 @@ step_kernel_build() {
     "${kmake[@]}" olddefconfig
 
     local changed unexpected
-    changed=$(diff <(grep -E '^(# )?CONFIG_' "$stock/stock.config" | sort) <(grep -E '^(# )?CONFIG_' "$out/.config" | sort) \
+    changed=$({ diff <(grep -E '^(# )?CONFIG_' "$stock/stock.config" | sort) <(grep -E '^(# )?CONFIG_' "$out/.config" | sort) || true; } \
         | sed -nE 's/^[<>] (# )?(CONFIG_[A-Za-z0-9_]+).*/\2/p' | sort -u)
     unexpected=$(comm -23 <(echo "$changed") <(printf '%s\n' "${KERNEL_CONFIG_CHANGES_ALLOWED[@]}" | sort))
     [ -z "$unexpected" ] || die "kernel config differs from stock in: $unexpected"
