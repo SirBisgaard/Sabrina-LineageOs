@@ -133,9 +133,9 @@ These are the steps used on the tested device, from an empty folder to a set-up 
 You need:
 
 - Docker and git.
-- Roughly 300 GB free for the build. This is an estimate.
-- 16 GB RAM or more, plus swap.
-- Several hours for the first build.
+- About 200 GB free for the build.
+- 16 GB RAM or more, plus swap. The measured build had 31 GB.
+- About 4 hours for the first build. See [Build time and disk space](#build-time-and-disk-space).
 
 **1. Make the build folder.** Optionally, put your own stock OTA for `UTTC.250917.004` in it. If it is missing, the build downloads the one linked from sabrina-unlock-v2. Either way, its SHA-256 has to match.
 
@@ -212,6 +212,34 @@ adb shell service call netpolicy 3 i32 <uid> i32 262144
 ```
 
 **Updating later.** Keep `~/sabrina/work` between builds. Pull the repository and rerun steps 2 to 4: finished steps are skipped, the Android build only rebuilds what changed, and ccache in `~/sabrina/work/ccache` speeds up the rest, so an update takes a fraction of the first build. To pick up changed patches or overlay files, reset the patched projects and delete `~/sabrina/work/.stamps/device` first. Then run steps 5 to 7, flashing only `super` and `boot`, and skip `fastboot -w`. Every build from this repository uses the same AOSP test keys, so it flashes over the top and keeps apps, sign-in and settings.
+
+### Build time and disk space
+
+Measured on the first full Docker build, on a machine with 12 CPU threads, 31 GB RAM and an NVMe disk:
+
+| Step | Time |
+|---|---|
+| `guide`, `init`, `sync` (source download) | 18 min |
+| `stock`, `apps`, `kernel_tools`, `kernel_source`, `kernel_stock` | 5 min |
+| `kernel_build` | 14 min |
+| `build` (Android, 130,300 actions) | 2 h 56 min |
+| `images` | 6 min |
+| **Total** | **about 3 h 40 min** |
+
+The download time depends on your connection. An update only rebuilds what changed, and ccache saves most of the Android build after a clean `out/`.
+
+| Part of the work folder | Size |
+|---|---|
+| `android16/`, the source checkout | ~87 GB |
+| `android16/out/`, the Android build output | 60 GB |
+| `android16/.repo/`, git objects | 29 GB |
+| `ccache/` | ~5 GB, up to `CCACHE_SIZE` (50 GB) |
+| `kernel/` | 4.7 GB |
+| `images/` and `dist/` | 3.4 GB |
+| `inputs/` and the rest | under 1 GB |
+| **Total** | **186 GB** |
+
+The Docker image itself is 1.6 GB. `android16/out/` is the only part you can delete without losing anything; the next build then redoes the Android build, faster with ccache.
 
 ## What it builds
 
