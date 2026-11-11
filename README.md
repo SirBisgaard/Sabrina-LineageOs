@@ -213,7 +213,13 @@ adb shell pm list packages -U <package>    # shows the app's uid
 adb shell service call netpolicy 3 i32 <uid> i32 262144
 ```
 
-**Updating later.** Keep `work/` between builds. Go back to the repository folder (`cd ~/sabrina/Sabrina-LineageOs`), run `git pull`, and rerun steps 2 to 4: finished steps are skipped, the Android build only rebuilds what changed, and ccache in `work/ccache` speeds up the rest, so an update takes a fraction of the first build. To pick up changed patches or overlay files, reset the patched projects and delete `work/.stamps/device` first. Then run steps 5 to 7, flashing only `super` and `boot`, and skip `fastboot -w`. Every build from this repository uses the same AOSP test keys, so it flashes over the top and keeps apps, sign-in and settings.
+**Verify a build** by comparing it with another flash set, for example the previous release:
+
+```bash
+python3 tools/compare_images.py work/dist /path/to/previous/dist
+```
+
+It compares the boot image part by part, the `super` layout, and every partition file by file, including owners, modes and SELinux labels. Every build stamp comes from one fixed time, the pinned guide commit's (`SOURCE_DATE_EPOCH` overrides it), so two builds of the same sources should be byte-identical.
 
 ### Build time and disk space
 
@@ -309,6 +315,7 @@ The pstore logs only survive a warm reboot, such as the watchdog's. Unplugging t
 - **Normal boots stay black with adb off; decided to run with adb on.** With the plain boot image, system_server blocks at startup in `DisplayManagerService` waiting for SurfaceFlinger (`waitForService<ISurfaceComposer>`), which never registers, and Android's watchdog restarts it every 77 seconds. The same image with only adb switched on (`force_debuggable` plus `ro.adb.secure=0` and `persist.sys.usb.config=adb`) boots normally, whether flashed or booted from RAM. The debuggable flag, the userdebug SELinux policy and flashed versus `fastboot boot` were each ruled out, which leaves the USB setup with adb off.
 - **Apps installed from Play had no network, fixed.** LineageOS gives a newly installed app `POLICY_REJECT_ALL` when `checkUidPermission(INTERNET)` says it lacks INTERNET. On this build that check fails during `PACKAGE_ADDED` even for apps that request it, so the app gets "No address associated with hostname" for every lookup and reports no internet; DR TV did. Android TV settings have no switch to undo it. `patches/frameworks_base-keep-network-for-apps-requesting-internet.patch` only blocks apps that don't request INTERNET in their manifest. `SabrinaSetupBridge` also lifts the block at each boot from third-party apps that request INTERNET. On a running device: `adb shell service call netpolicy 3 i32 <uid> i32 262144`.
 - **Signing in installs a lot.** After Google sign-in, the Play Store downloads and updates many Google and TV apps in the background. Give it time on a working network before judging speed or storage, and expect the first minutes to be slow.
+- **Casting didn't work, fixed.** Phones didn't list the Chromecast, and the kernel log repeated `[TEE] cast_auth_sign_hash: TEE_AEDecryptFinal failed!`. Google's setup wizard only uses the Chromecast's factory Cast credentials when the system declares `com.google.android.feature.GOOGLE_BUILD`, as Google's own firmware does. Without it, the wizard registered a Widevine-wrapped Cast key during setup, while the Cast receiver signs through the device's `castkey` plugin, whose trusted app can't unwrap that key. `overlay/device/google/sabrina16/permissions/sabrina-google-build.xml` declares the feature. `tools/cast_probe/cast_probe.sh` checks the factory credentials and the TEE's signing over adb. On a device that was set up without the feature, the wizard's stored credentials stay wrong until they are replaced with the factory ones or the device is set up again.
 - **adb is on after a fresh install.** `boot.img` switches adb on without an authorisation prompt, so even after `fastboot -w` a hang can be inspected over USB. Anyone with a USB cable to the device gets a shell, though not root.
 
 ## Fixes over the upstream guide
