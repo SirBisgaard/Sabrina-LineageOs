@@ -19,6 +19,8 @@ RESIZE2FS=/usr/sbin/resize2fs
 MKE2FS=/usr/sbin/mke2fs
 IMAGES=$WORK/images
 DIST=$WORK/dist
+KEYS=${KEYS:-/keys}
+SIGNED=$WORK/signed
 
 GUIDE_URL=https://github.com/fidalgojoao/lineageos-23.2-sabrina.git
 GUIDE_COMMIT=d50e03b84b1f2cae16ea0ea19c7db43d67d235e0
@@ -415,11 +417,77 @@ step_build() {
     # shellcheck disable=SC2154
     lunch lineage_gsi_sabrina16 "$aosp_target_release" user
     local goals=(systemimage checkvintf lpmake lpdump simg2img)
+    signing && goals+=(target-files-package otatools)
     [ "$DIAGNOSTIC" = 1 ] && goals+=(adb_debug.prop userdebug_plat_sepolicy.cil)
     m -j"$JOBS" "${goals[@]}"
     set -u
     ccache -s | grep -E 'Hits|Misses|Cache size' || true
     log "system image: $TREE/out/target/product/generic/system.img"
+}
+
+signing() {
+    [ -f "$KEYS/releasekey.pk8" ]
+}
+
+# Signs the target files with the release keys mounted at $KEYS and rebuilds the
+# system image from them. APEXes that are built but not shipped in the system
+# image are left unsigned; a shipped APEX without a release key stops the build.
+# APKs copied into the image as plain files, not built as apps, keep their
+# signatures too. Prebuilt apps marked presigned or preprocessed, such as
+# Google's, keep their own signatures so they can still update through Play.
+# Without keys the build stays on AOSP's test keys and this step does nothing.
+step_sign() {
+    rm -rf "$SIGNED"
+    signing || { log "no release keys in $KEYS: test keys"; return; }
+    mkdir -p "$SIGNED"
+    cd "$TREE"
+    local host=$TREE/out/host/linux-x86 jdk target_files args=() line name key keys
+    # The signing tools change permissions on the key files they read, which fails
+    # on a read-only mount, so they work on a copy that lives only in the container,
+    # at a fixed path because the OTA certificate is stored under it.
+    keys=/tmp/release-keys
+    rm -rf "$keys"
+    mkdir -p "$keys"
+    cp -r "$KEYS"/. "$keys"/
+    chmod -R u+rw "$keys"
+    jdk=$(find "$TREE/prebuilts/jdk" -maxdepth 3 -type d -path '*/linux-x86/bin' | sort -V | tail -1)
+    target_files=$(find "$TREE/out/target/product/generic/obj/PACKAGING/target_files_intermediates" \
+        -maxdepth 1 -name '*-target_files*.zip' | head -1)
+    [ -n "$target_files" ] || die "no target files; was the build run with the keys mounted?"
+
+    local shipped
+    shipped=$(unzip -Z1 "$target_files" 'SYSTEM/*apex/*' | sed -E 's#.*/##; s/\.capex$/.apex/')
+    while IFS= read -r line; do
+        name=$(sed -nE 's/^name="([^"]+)".*/\1/p' <<< "$line")
+        [ -n "$name" ] || continue
+        grep -q 'container_certificate="PRESIGNED"' <<< "$line" && continue
+        if ! grep -qxF "$name" <<< "$shipped"; then
+            args+=(--extra_apks "$name=PRESIGNED" --extra_apex_payload_key "$name=")
+            continue
+        fi
+        key=$keys/apex/${name%.apex}
+        if [ ! -f "$key.pk8" ] || [ ! -f "$key.pem" ]; then
+            die "no release key for $name in $KEYS/apex"
+        fi
+        args+=(--extra_apks "$name=$key" --extra_apex_payload_key "$name=$key.pem")
+    done < <(unzip -p "$target_files" META/apexkeys.txt)
+
+    local registered apk
+    registered=$(unzip -p "$target_files" META/apkcerts.txt | sed -nE 's/^name="([^"]+)".*/\1/p')
+    while IFS= read -r apk; do
+        grep -qxF "$apk" <<< "$registered" || args+=(-e "$apk=")
+    done < <(unzip -Z1 "$target_files" 'SYSTEM/*.apk' | sed -E 's#.*/##' | sort -u)
+
+    PATH=$host/bin:$jdk:$PATH ANDROID_BUILD_TOP=$TREE \
+        "$host/bin/sign_target_files_apks" -o -d "$keys" "${args[@]}" "$target_files" "$SIGNED/target_files.zip"
+    rm -rf "$keys"
+    PATH=$host/bin:$jdk:$PATH ANDROID_BUILD_TOP=$TREE \
+        "$host/bin/add_img_to_target_files" -a "$SIGNED/target_files.zip"
+    unzip -p "$SIGNED/target_files.zip" IMAGES/system.img > "$SIGNED/system.img"
+    unzip -p "$SIGNED/target_files.zip" SYSTEM/build.prop | grep -q 'release-keys' \
+        || die "signed system does not report release-keys"
+    openssl x509 -in "$KEYS/releasekey.x509.pem" -noout -fingerprint -sha256 > "$SIGNED/releasekey.txt"
+    log "signed with the release keys: $(cut -d= -f2 "$SIGNED/releasekey.txt")"
 }
 
 stock_partition() {
@@ -470,7 +538,11 @@ step_images() {
         stock_partition "$ota" "$name" stock
     done
     mv stock/odm.img stock/system_dlkm.img .
-    cp "$TREE/out/target/product/generic/system.img" system.img
+    if [ -f "$SIGNED/system.img" ]; then
+        cp "$SIGNED/system.img" system.img
+    else
+        cp "$TREE/out/target/product/generic/system.img" system.img
+    fi
 
     # Stock vendor uses deduplicated blocks; unshare them so replacing the fstab frees no shared block.
     cp stock/vendor.img vendor.img
@@ -504,30 +576,20 @@ EOF
         -E hash_seed=5ab21aa0-0000-4000-8000-000000000002 product.img
 
     python3 "$TREE/system/tools/mkbootimg/unpack_bootimg.py" --boot_img stock/boot.img --out stock/boot >/dev/null
-    python3 -I "$HERE/tools/edit_ramdisk_fstab.py" stock/boot/ramdisk ramdisk.base.img first_stage_ramdisk/fstab.amlogic 'product '
-    # With adb off, system_server waits forever for SurfaceFlinger and the screen
-    # stays black, so the production ramdisk switches adb on without marking the
-    # build debuggable: force_debuggable only makes init read adb_debug.prop.
-    printf 'ro.adb.secure=0\npersist.sys.usb.config=adb\n' > adb_debug.prop
-    : > force_debuggable
-    local files=() name
-    for name in force_debuggable adb_debug.prop; do
-        files+=("$name=$name" "first_stage_ramdisk/$name=$name")
-    done
-    python3 -I "$HERE/tools/add_ramdisk_files.py" ramdisk.base.img ramdisk.img "${files[@]}"
+    python3 -I "$HERE/tools/edit_ramdisk_fstab.py" stock/boot/ramdisk ramdisk.img first_stage_ramdisk/fstab.amlogic 'product '
     make_boot "$DIST/boot.img" " sabrina.selinux=permissive"
     if [ "$DIAGNOSTIC" = 1 ]; then
         make_boot "$DIST/boot-permissive.img" " sabrina.selinux=permissive androidboot.sabrina_watchdog=1"
+        local files=() name
         mkdir -p debug
         cp "$TREE/out/target/product/generic/debug_ramdisk/"{adb_debug.prop,userdebug_plat_sepolicy.cil} debug/
         echo 'persist.sys.usb.config=adb' >> debug/adb_debug.prop
         : > debug/force_debuggable
-        files=()
         for name in force_debuggable adb_debug.prop userdebug_plat_sepolicy.cil; do
             files+=("$name=debug/$name" "first_stage_ramdisk/$name=debug/$name")
         done
         cp ramdisk.img ramdisk.release.img
-        python3 -I "$HERE/tools/add_ramdisk_files.py" ramdisk.base.img ramdisk.img "${files[@]}"
+        python3 -I "$HERE/tools/add_ramdisk_files.py" ramdisk.release.img ramdisk.img "${files[@]}"
         make_boot "$DIST/boot-debug.img" " sabrina.selinux=permissive androidboot.sabrina_watchdog=1"
         mv ramdisk.release.img ramdisk.img
     fi
@@ -553,15 +615,20 @@ EOF
     python3 -I "$TREE/external/avb/avbtool.py" make_vbmeta_image --flags 3 --padding_size 4096 \
         --output "$DIST/vbmeta.img"
 
+    if [ -f "$SIGNED/releasekey.txt" ]; then
+        echo "release-keys, releasekey $(cat "$SIGNED/releasekey.txt")" > "$DIST/KEYS.txt"
+    else
+        echo "test-keys (AOSP's public keys)" > "$DIST/KEYS.txt"
+    fi
     (cd "$DIST" && sha256sum -- *.img > SHA256SUMS.txt)
     log "flash set: $DIST"
 }
 
 # Each step leaves a marker in .stamps/ and is skipped on the next run, except
-# build and images. Name steps as arguments to run only those.
+# build, sign and images. Name steps as arguments to run only those.
 main() {
-    local steps=(guide init sync device stock apps kernel_tools kernel_source kernel_stock kernel_build build images)
-    local always=" build images "
+    local steps=(guide init sync device stock apps kernel_tools kernel_source kernel_stock kernel_build build sign images)
+    local always=" build sign images "
     [ $# -eq 0 ] || steps=("$@")
     mkdir -p "$STAMPS"
 
