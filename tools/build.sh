@@ -24,7 +24,7 @@ GUIDE_URL=https://github.com/fidalgojoao/lineageos-23.2-sabrina.git
 GUIDE_COMMIT=d50e03b84b1f2cae16ea0ea19c7db43d67d235e0
 LINEAGE_URL=https://github.com/LineageOS/android.git
 LINEAGE_BRANCH=lineage-23.2
-REPO_FLAGS=(--depth=1 -g all --git-lfs --no-clone-bundle)
+REPO_FLAGS=(--depth=1 -g all --git-lfs --no-clone-bundle --repo-rev=v2.72)
 
 OTA_URL=https://android.googleapis.com/packages/ota-api/package/0d0a14a015085ddff485765a28559bcd858d3018.zip
 OTA_SHA256=8aacf5f69036c7b881756f031b45834b1770a6973debe07fc8b8d832d9f0c5c2
@@ -61,6 +61,21 @@ STOCK_APKS=(
     overlay/AxelOverlay/ChromecastAxelOverlay.apk
     etc/permissions/privapp-permissions-atv-product.xml
     etc/default-permissions/default-atv-permissions.xml
+)
+
+PATCHED_PROJECTS=(
+    bootable/recovery
+    device/google/atv
+    frameworks/base
+    packages/apps/TvSettings
+    packages/apps/Updater
+    packages/modules/AdServices
+    packages/modules/OnDevicePersonalization
+    packages/modules/Wifi
+    system/apex
+    system/core
+    system/sepolicy
+    vendor/lineage
 )
 
 SUPER_SIZE=2084569088
@@ -111,10 +126,18 @@ stock_ota() {
     echo "$ota"
 }
 
+# Every build stamp comes from one fixed time, the pinned guide commit's, so two
+# builds of the same sources are byte-identical. Override with SOURCE_DATE_EPOCH.
+source_date_epoch() {
+    echo "${SOURCE_DATE_EPOCH:-$(git -C "$GUIDE" log -1 --format=%ct)}"
+}
+
 kernel_env() {
     export PATH="$KERNEL/tools/clang-r487747c/bin:$KERNEL/tools/pahole:$PATH"
     export LD_LIBRARY_PATH="$KERNEL/tools/pahole/lib64"
     export KBUILD_BUILD_USER=build-user KBUILD_BUILD_HOST=build-host
+    KBUILD_BUILD_TIMESTAMP=$(date -u -d "@$(source_date_epoch)")
+    export KBUILD_BUILD_TIMESTAMP
 }
 
 missing_projects() {
@@ -175,13 +198,18 @@ step_sync() {
     [ "$(head -c 2 "$webview")" = PK ] || die "$webview is still a Git LFS pointer"
 }
 
-# Copies the device tree, lays overlay/ on top and applies the upstream patches.
-# The patches can't be applied twice: to redo this step, reset the patched
-# projects first, then delete .stamps/device. The diagnostic init is always
-# applied: it holds the sabrina.selinux=permissive switch, and its watchdog only
-# runs with androidboot.sabrina_watchdog=1 on the kernel command line.
+# Resets the patched projects, copies the device tree, lays overlay/ on top and
+# applies the upstream and local patches. Delete .stamps/device to redo it after
+# changing patches or overlay/. The diagnostic init is always applied: it holds
+# the sabrina.selinux=permissive switch, and its watchdog only runs with
+# androidboot.sabrina_watchdog=1 on the kernel command line.
 step_device() {
     cd "$TREE"
+    local project
+    for project in "${PATCHED_PROJECTS[@]}"; do
+        git -C "$project" reset -q --hard HEAD
+        git -C "$project" clean -qfd
+    done
     rm -rf device/google/sabrina16
     cp -r "$GUIDE/device/google/sabrina16" device/google/
     cp -r "$HERE/overlay/." .
@@ -272,14 +300,17 @@ step_kernel_tools() {
 # patch set and the upstream kernel patches are applied.
 step_kernel_source() {
     local common=$KERNEL/common
+    GIT_AUTHOR_DATE="@$(source_date_epoch) +0000"
+    GIT_COMMITTER_DATE=$GIT_AUTHOR_DATE
+    export GIT_AUTHOR_DATE GIT_COMMITTER_DATE
     shallow_clone "$common" "$KERNEL_COMMON_URL" "$KERNEL_COMMON_COMMIT"
     shallow_clone "$common/common_drivers" "$AMLOGIC_DRIVER_URL" "$AMLOGIC_DRIVER_COMMIT"
     echo common_drivers >> "$common/.git/info/exclude"
     cd "$common"
 
     local patches=common_drivers/auto_patch/common14-5.15/common group patch change_id
-    for group in $(ls "$patches"); do
-        for patch in $(find "$patches/$group" -name '*.patch' | sort); do
+    for group in "$patches"/*/; do
+        for patch in $(find "$group" -name '*.patch' | sort); do
             change_id=$({ grep -m1 '^Change-Id' "$patch" || true; } | awk '{print $2}')
             if [ -n "$change_id" ] && git log -n 400 --format=%B | grep -q "$change_id"; then
                 continue
@@ -372,11 +403,16 @@ step_build() {
     mkdir -p out
     repo manifest -o out/sabrina-source-manifest.xml
     set +u
+    # shellcheck source=/dev/null
     source build/envsetup.sh
+    # shellcheck source=/dev/null
     source vendor/lineage/vars/aosp_target_release
     export USE_CCACHE=1 CCACHE_EXEC=/usr/bin/ccache CCACHE_DIR=$WORK/ccache
+    BUILD_DATETIME=$(source_date_epoch)
+    export BUILD_DATETIME BUILD_USERNAME=sabrina BUILD_HOSTNAME=sabrina-build
     mkdir -p "$CCACHE_DIR"
     ccache -M "$CCACHE_SIZE" >/dev/null
+    # shellcheck disable=SC2154
     lunch lineage_gsi_sabrina16 "$aosp_target_release" user
     local goals=(systemimage checkvintf lpmake lpdump simg2img)
     [ "$DIAGNOSTIC" = 1 ] && goals+=(adb_debug.prop userdebug_plat_sepolicy.cil)
@@ -400,9 +436,9 @@ make_boot() {
         --boot_img "$IMAGES/stock/boot.img" --out "$IMAGES/stock/boot" --format mkbootimg))"
     for i in "${!args[@]}"; do
         case "${args[$i]}" in
-            --kernel) args[$((i + 1))]=$KERNEL/dist/Image.lzma ;;
-            --ramdisk) args[$((i + 1))]=$IMAGES/ramdisk.img ;;
-            --cmdline) args[$((i + 1))]="${args[$((i + 1))]}$extra_cmdline" ;;
+            --kernel) args[i + 1]=$KERNEL/dist/Image.lzma ;;
+            --ramdisk) args[i + 1]=$IMAGES/ramdisk.img ;;
+            --cmdline) args[i + 1]="${args[i + 1]}$extra_cmdline" ;;
         esac
     done
     python3 "$TREE/system/tools/mkbootimg/mkbootimg.py" "${args[@]}" --output "$out"
@@ -413,7 +449,8 @@ make_boot() {
     done < <(python3 -I "$TREE/external/avb/avbtool.py" info_image --image "$IMAGES/stock/boot.img" \
         | sed -nE "s/^ +Prop: (\S+) -> '(.*)'$/\1\t\2/p")
     python3 -I "$TREE/external/avb/avbtool.py" add_hash_footer --image "$out" --partition_name boot \
-        --partition_size "$BOOT_PARTITION_SIZE" --algorithm NONE "${props[@]}"
+        --partition_size "$BOOT_PARTITION_SIZE" --algorithm NONE "${props[@]}" \
+        --salt "$(basename "$out" | sha256sum | cut -c1-64)"
 }
 
 # Builds vendor, boot, product, super and vbmeta, which the device tree never
@@ -422,6 +459,8 @@ make_boot() {
 step_images() {
     local ota host=$TREE/out/host/linux-x86/bin
     ota=$(stock_ota)
+    E2FSPROGS_FAKE_TIME=$(source_date_epoch)
+    export E2FSPROGS_FAKE_TIME
     rm -rf "$IMAGES" "$DIST"
     mkdir -p "$IMAGES/stock" "$DIST"
     cd "$IMAGES"
@@ -461,7 +500,8 @@ EOF
     cmp fstab.readback fstab.amlogic || die "vendor fstab readback differs"
 
     truncate -s 4M product.img
-    "$MKE2FS" -q -t ext4 -F -b 4096 -L product product.img
+    "$MKE2FS" -q -t ext4 -F -b 4096 -L product -U 5ab21aa0-0000-4000-8000-000000000001 \
+        -E hash_seed=5ab21aa0-0000-4000-8000-000000000002 product.img
 
     python3 "$TREE/system/tools/mkbootimg/unpack_bootimg.py" --boot_img stock/boot.img --out stock/boot >/dev/null
     python3 -I "$HERE/tools/edit_ramdisk_fstab.py" stock/boot/ramdisk ramdisk.base.img first_stage_ramdisk/fstab.amlogic 'product '
@@ -493,8 +533,8 @@ EOF
     fi
 
     local total=0 cmd=("$host/lpmake" --metadata-size=65536 --metadata-slots=2
-        --device=super:$SUPER_SIZE:1048576:0 --super-name=super
-        --group=$SUPER_GROUP:$SUPER_GROUP_SIZE --block-size=4096)
+        "--device=super:$SUPER_SIZE:1048576:0" --super-name=super
+        "--group=$SUPER_GROUP:$SUPER_GROUP_SIZE" --block-size=4096)
     for name in "${SUPER_PARTITIONS[@]}"; do
         total=$(( total + $(stat -c %s "$name.img") ))
         cmd+=(--partition="$name:readonly:$(stat -c %s "$name.img"):$SUPER_GROUP" --image="$name=$name.img")
