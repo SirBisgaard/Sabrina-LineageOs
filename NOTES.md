@@ -1,0 +1,24 @@
+# Notes
+
+Background for people working on this build: what went wrong on the device, and what this repository fixes compared with the upstream guide.
+
+## Findings from flashing
+
+- **system_server crash loop, fixed.** The upstream TvSettings patch makes TV Settings use `android.permission.HDMI_CEC` but doesn't add it to TV Settings' privileged-permission allowlist. `PermissionService.onSystemReady` throws `Signature|privileged permissions not in privileged permission allowlist`, system_server restarts forever, and the screen shows the G logo, then black or the LineageOS boot animation. `patches/packages_apps_TvSettings-hdmi-cec-allowlist.patch` adds it.
+- **Getting into fastboot.** On stock, `adb reboot bootloader` comes straight back to Android. `adb reboot fastboot`, then `fastboot reboot bootloader`, works, as does holding the button at power-on. On this build, `adb reboot bootloader` works.
+- **USB.** Flashing `super` through a USB hub failed partway with `reap_urb ... Protocol error`. A rear motherboard port and `-S 64M` worked every time. A failed `super` flash isn't a brick: the bootloader stays, so flash again from the start.
+- **Setup loop, fixed** by `SabrinaSetupBridge`, see [What it builds](README.md#what-it-builds). Its home activity needs `launchMode="singleTask"`; without it the system refuses with `Can't change activity type once set`. Tested: after setup, Catapult held the home role and the wizard's home activity was disabled.
+- **Remote pairing crash, harmless.** While pairing the remote, the wizard crashes once with `NoSuchMethodException: BluetoothHidHost.setPriority`. It calls a method Android 16 removed. The remote still pairs, and the wizard restarts at the same step.
+- **Black screen on a computer's USB port: the low-power warning.** At `early-boot`, Google's `/odm/bin/low_power_warning` checks the USB-C power source, and init waits for it before starting SurfaceFlinger, USB and Wi-Fi. On a weak source it waits indefinitely and the screen stays black, unless adb is in the USB configuration, in which case it gives up after 5 seconds. Earlier builds therefore switched adb on in the boot image. On the Chromecast's own power supply the check passes and the boot is normal. To develop on a computer's USB port, switch on USB debugging in Developer options; `persist.odm.low_power_warning.enable=false` turns the warning off entirely.
+- **Apps installed from Play had no network, fixed.** LineageOS gives a newly installed app `POLICY_REJECT_ALL` when `checkUidPermission(INTERNET)` says it lacks INTERNET. On this build that check fails during `PACKAGE_ADDED` even for apps that request it, so the app gets "No address associated with hostname" for every lookup and reports no internet; DR TV did. Android TV settings have no switch to undo it. `patches/frameworks_base-keep-network-for-apps-requesting-internet.patch` only blocks apps that don't request INTERNET in their manifest. `SabrinaSetupBridge` also lifts the block at each boot from third-party apps that request INTERNET. On a running device: `adb shell service call netpolicy 3 i32 <uid> i32 262144`.
+- **Signing in installs a lot.** After Google sign-in, the Play Store downloads and updates many Google and TV apps in the background. Give it time on a working network before judging speed or storage, and expect the first minutes to be slow.
+- **Casting didn't work, fixed.** Phones didn't list the Chromecast, and the kernel log repeated `[TEE] cast_auth_sign_hash: TEE_AEDecryptFinal failed!`. Google's setup wizard only uses the Chromecast's factory Cast credentials when the system declares `com.google.android.feature.GOOGLE_BUILD`, as Google's own firmware does. Without it, the wizard registered a Widevine-wrapped Cast key during setup, while the Cast receiver signs through the device's `castkey` plugin, whose trusted app can't unwrap that key. `overlay/device/google/sabrina16/permissions/sabrina-google-build.xml` declares the feature. `tools/cast_probe/cast_probe.sh` checks the factory credentials and the TEE's signing over adb. On a device that was set up without the feature, the wizard's stored credentials stay wrong until they are replaced with the factory ones or the device is set up again.
+
+## Fixes over the upstream guide
+
+- The pinned manifest and the Google apps local manifest both list `vendor/gapps_tv`. The duplicate is removed from the pinned copy.
+- Most projects are in AOSP groups that a plain sync skips, so it syncs with `-g all`.
+- The build needs `out/sabrina-source-manifest.xml`, which the guide does not create.
+- The WebView prebuilt is stored with Git LFS, which repo skips by default.
+- The emulator's Bluetooth properties and the device makefile both set the battery client, which the build rejects as a duplicate.
+- The device tree never builds `boot`, `vendor`, `super` or `vbmeta`, and has no kernel.
