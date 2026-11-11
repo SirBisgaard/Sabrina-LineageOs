@@ -44,6 +44,7 @@ PRODUCT_COPY_FILES += \
     device/google/sabrina16/permissions/privapp-permissions-sabrina-dreamx.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp-permissions-sabrina-dreamx.xml \
     device/google/sabrina16/permissions/sabrina-launcher-defaults.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/default-permissions/sabrina-launcher-defaults.xml \
     device/google/sabrina16/permissions/sabrina-google-tv.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/sysconfig/sabrina-google-tv.xml \
+    device/google/sabrina16/permissions/sabrina-google-build.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/sysconfig/sabrina-google-build.xml \
     device/google/sabrina16/permissions/sabrina-ota-components.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/sysconfig/sabrina-ota-components.xml \
     device/google/sabrina16/permissions/sabrina-privacy-components.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/sysconfig/sabrina-privacy-components.xml
 
