@@ -19,8 +19,9 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
  && apt-get install -y --no-install-recommends \
       bc bison brotli build-essential ca-certificates ccache cpio curl e2fsprogs file flex \
       g++-multilib gcc-multilib git git-lfs gnupg gperf imagemagick \
-      lib32readline-dev lib32z1-dev libelf-dev libncurses-dev libsdl1.2-dev libssl-dev \
-      libxml2 libxml2-utils lz4 lzop openssl pngcrush procps python-is-python3 python3 rsync \
+      lib32readline-dev lib32z1-dev libdw-dev libelf-dev libncurses-dev libsdl1.2-dev libssl-dev \
+      libxml2 libxml2-utils lz4 lzop openssl pngcrush procps protobuf-compiler python-is-python3 \
+      python3 python3-protobuf rsync \
       schedtool shellcheck squashfs-tools unzip xsltproc xz-utils zip zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
@@ -34,6 +35,7 @@ RUN groupadd -o -g "$GID" builder \
 COPY --chown=builder:builder overlay /opt/sabrina/overlay
 COPY --chown=builder:builder tools /opt/sabrina/tools
 COPY --chown=builder:builder patches /opt/sabrina/patches
+COPY --chown=builder:builder manifests /opt/sabrina/manifests
 
 USER builder
 RUN git config --global user.name "Sabrina Builder" \

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <include name="manifests/snippets/kernel-5.15.xml" />
+
+  <project path="device/google/sabrina" name="LineageOS/android_device_google_sabrina" />
+  <project path="device/amlogic/g12-common" name="LineageOS/android_device_amlogic_g12-common" />
+  <project path="device/amlogic/common" name="LineageOS/android_device_amlogic_common" />
+  <project path="device/amlogic/sepolicy" name="LineageOS/android_device_amlogic_sepolicy" />
+  <project path="hardware/amlogic/tools/dtbtool" name="LineageOS/android_hardware_amlogic_tools_dtbtool" />
+  <project path="hardware/amlogic/tools/imagepacker" name="LineageOS/android_hardware_amlogic_tools_imagepacker" />
+  <project path="hardware/amlogic/tools/respacker" name="LineageOS/android_hardware_amlogic_tools_respacker" />
+
+  <project path="kernel/platform/kernel-5.15/vendor/google/sabrina-build" name="LineageOS/android_kernel_google_sabrina-build" />
+  <project path="kernel/platform/kernel-5.15/vendor/amlogic/kernel" name="LineageOS/android_kernel_amlogic_kernel-5.15" />
+  <project path="kernel/platform/kernel-5.15/vendor/amlogic/common_drivers" name="LineageOS/android_kernel_amlogic_common_drivers" />
+  <project path="kernel/platform/kernel-5.15/vendor/amlogic/gpu-modules" name="LineageOS/android_kernel_amlogic_gpu-modules" />
+  <project path="kernel/platform/kernel-5.15/vendor/amlogic/media-modules" name="LineageOS/android_kernel_amlogic_media-modules" />
+  <project path="kernel/platform/kernel-5.15/vendor/amlogic/dhd-driver" name="LineageOS/android_kernel_amlogic_dhd-driver" />
+
+  <project path="vendor/google/sabrina" name="TheMuppets/proprietary_vendor_google_sabrina" />
+  <project path="vendor/amlogic/g12-common" name="TheMuppets/proprietary_vendor_amlogic_g12-common" />
+</manifest>
