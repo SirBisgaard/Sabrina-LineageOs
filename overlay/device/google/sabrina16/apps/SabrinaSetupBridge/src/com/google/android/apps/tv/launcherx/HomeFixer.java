@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: EUPL-1.2
 package com.google.android.apps.tv.launcherx;
 
 import android.app.role.RoleManager;
