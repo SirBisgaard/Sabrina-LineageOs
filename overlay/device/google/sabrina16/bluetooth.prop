@@ -36,3 +36,22 @@ bluetooth.profile.pan.nap.enabled=true
 bluetooth.profile.pan.panu.enabled=true
 bluetooth.profile.pbap.server.enabled=true
 bluetooth.core.gap.le.privacy.enabled=false
+
+# Google's LE connection timings and remote HID waits from stock vendor/build.prop.
+# Android 16 no longer lets the vendor partition set bluetooth.* properties.
+bluetooth.core.gap.le.conn.only_init_1m_phy.enabled=false
+bluetooth.core.le.connection_latency=0
+bluetooth.core.le.connection_scan_interval_fast=96
+bluetooth.core.le.connection_scan_window_fast=48
+bluetooth.core.le.connection_scan_window_2m_fast=48
+bluetooth.core.le.connection_scan_window_coded_fast=48
+bluetooth.core.le.direct_connection_timeout=30000
+bluetooth.core.le.inquiry_scan_interval=160
+bluetooth.core.le.inquiry_scan_window=160
+bluetooth.core.le.connection_scan_interval_slow=1536
+bluetooth.core.le.connection_scan_window_slow=96
+bluetooth.core.le.max_connection_interval=12
+bluetooth.core.le.min_connection_interval=6
+bluetooth.core.le.connection_supervision_timeout=500
+bluetooth.core.hogp.wait_us_after_uhid_open=200000
+bluetooth.hid.wait_ms_after_uhid_open=200
