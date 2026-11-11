@@ -137,34 +137,36 @@ You need:
 - 16 GB RAM or more, plus swap. The measured build had 31 GB.
 - About 4 hours for the first build. See [Build time and disk space](#build-time-and-disk-space).
 
+All commands in steps 1 to 4 run from the repository folder. The build goes in `work/` inside it, which git and Docker both ignore, so nothing in it is committed or copied into the Docker image.
+
 **1. Make the build folder.** Optionally, put your own stock OTA for `UTTC.250917.004` in it. If it is missing, the build downloads the one linked from sabrina-unlock-v2. Either way, its SHA-256 has to match.
 
 ```bash
-mkdir -p ~/sabrina/work/inputs
-cp /path/to/stock-ota.zip ~/sabrina/work/inputs/stock-ota.zip   # optional
+cd ~/sabrina/Sabrina-LineageOs
+mkdir -p work/inputs
+cp /path/to/stock-ota.zip work/inputs/stock-ota.zip   # optional
 ```
 
 **2. Build the Docker image:**
 
 ```bash
-cd ~/sabrina/Sabrina-LineageOs
 docker build -t sabrina-build --build-arg UID=$(id -u) --build-arg GID=$(id -g) .
 ```
 
 **3. Run the build:**
 
 ```bash
-docker run --rm -v ~/sabrina/work:/work sabrina-build
+docker run --rm -v "$PWD/work":/work sabrina-build
 ```
 
 It downloads the sources, builds the kernel and LineageOS, and assembles the images. The comments in `tools/build.sh` say what each step does. If it stops, run the same command again: finished steps are skipped. Settings can be passed with `-e`: `JOBS` (build jobs, default all cores; lower it if the machine starts swapping), `SYNC_JOBS` (parallel downloads, default 8) and `CCACHE_SIZE` (default `50G`). Every git checkout is shallow (`--depth=1`), so no history is downloaded.
 
-The results are in `~/sabrina/work/dist/`: `super.sparse.img`, `boot.img`, `vbmeta.img`, `SHA256SUMS.txt` and the exact `lpmake` command. The kernel and its checksums are in `~/sabrina/work/kernel/dist/`.
+The results are in `work/dist/`: `super.sparse.img`, `boot.img`, `vbmeta.img`, `SHA256SUMS.txt` and the exact `lpmake` command. The kernel and its checksums are in `work/kernel/dist/`.
 
 **4. Check the images:**
 
 ```bash
-cd ~/sabrina/work/dist
+cd work/dist
 sha256sum -c SHA256SUMS.txt
 ```
 
@@ -211,7 +213,7 @@ adb shell pm list packages -U <package>    # shows the app's uid
 adb shell service call netpolicy 3 i32 <uid> i32 262144
 ```
 
-**Updating later.** Keep `~/sabrina/work` between builds. Pull the repository and rerun steps 2 to 4: finished steps are skipped, the Android build only rebuilds what changed, and ccache in `~/sabrina/work/ccache` speeds up the rest, so an update takes a fraction of the first build. To pick up changed patches or overlay files, reset the patched projects and delete `~/sabrina/work/.stamps/device` first. Then run steps 5 to 7, flashing only `super` and `boot`, and skip `fastboot -w`. Every build from this repository uses the same AOSP test keys, so it flashes over the top and keeps apps, sign-in and settings.
+**Updating later.** Keep `work/` between builds. Go back to the repository folder (`cd ~/sabrina/Sabrina-LineageOs`), run `git pull`, and rerun steps 2 to 4: finished steps are skipped, the Android build only rebuilds what changed, and ccache in `work/ccache` speeds up the rest, so an update takes a fraction of the first build. To pick up changed patches or overlay files, reset the patched projects and delete `work/.stamps/device` first. Then run steps 5 to 7, flashing only `super` and `boot`, and skip `fastboot -w`. Every build from this repository uses the same AOSP test keys, so it flashes over the top and keeps apps, sign-in and settings.
 
 ### Build time and disk space
 
@@ -278,7 +280,7 @@ The build uses AOSP test keys, and doesn't sign the images. That suits an unlock
 Every build includes the upstream `patches/diagnostic/` changes to init and apexd, because they hold the `sabrina.selinux=permissive` switch. `DIAGNOSTIC=1` adds two extra boot images: `boot-permissive.img`, which is `boot.img` with the watchdog switched on, and `boot-debug.img`. Booted with either, init logs each boot stage. If boot doesn't finish, it copies logcat into the kernel log and warm-reboots to the bootloader, so the log survives in RAM. The watchdog only runs with `androidboot.sabrina_watchdog=1` on the kernel command line (`patches/system_core-diagnostic-watchdog-opt-in.patch`), which the diagnostic boot images add and a production boot image leaves out. Without it, init logs `sabrina_watchdog: disabled` and doesn't reboot to the bootloader on a crash. It waits 2.5 minutes for boot to complete, or 5 minutes once zygote is running (`patches/system_core-diagnostic-watchdog-5min.patch`; upstream waits 15). Use it to debug, not daily:
 
 ```bash
-docker run --rm -e DIAGNOSTIC=1 -v /path/to/workdir:/work sabrina-build
+docker run --rm -e DIAGNOSTIC=1 -v "$PWD/work":/work sabrina-build   # from the repository folder
 ```
 
 `DIAGNOSTIC` takes effect in the `build` and `images` steps, which always run.
